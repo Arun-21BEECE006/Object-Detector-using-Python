@@ -1,42 +1,114 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection Website</title>
-    <button onclick="redirecttologinpage()">Login</button>
-</head>
-<body>
-    <h1>Object Detection Website</h1>
-    <form id="upload-form" enctype="multipart/form-data">
-        <input type="file" name="image" accept="image/*" required>
-        <button type="button" onclick="detectObjects()">Detect Objects</button>
-    </form>
-    <div id="output-container">
-        <!-- Display the detected image here -->
-        <!-- <img id="output-image" src="static\images\uploaded_image.jpg" alt="Detected Image"> -->
+<!doctype html>
+<html>
+  <head>
+    <title>Object Detection</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Object Detection</h1>
+      <p>Upload image only (png and Jpg Files)</p>
+
+      <form id="upload-form">
+        <input type="file" id="fileInput" name="image" required />
+        <p id="file-name"></p>
+        <button type="button" onclick="detect()">Detect</button>
+      </form>
+
+      <!-- Loader -->
+      <div id="loader" style="display: none">
+        <div class="spinner"></div>
+        <p id="progress-text">Scanning: 0%</p>
+        <div class="progress-bar">
+          <div id="progress"></div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div id="preview"></div>
     </div>
 
     <script>
-        function detectObjects() {
-            const form = document.getElementById('upload-form');
-            const formData = new FormData(form);
+      const allowedFormats = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/tiff",
+        "image/avif",
+      ];
 
-            fetch('/detect', {
-                method: 'POST',
-                body: formData
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", function () {
+          const file = this.files[0];
+
+          if (!file) return;
+
+          // Validate file type
+          if (!allowedFormats.includes(file.type)) {
+            alert("Only PNG, JPG, JPEG, GIF, TIFF, AVIF allowed!");
+            this.value = "";
+            return;
+          }
+
+          //   document.getElementById("file-name").innerText =
+          //     "Selected: " + file.name;
+        });
+
+      function detect() {
+        const form = document.getElementById("upload-form");
+        const data = new FormData(form);
+
+        document.getElementById("preview").innerHTML = "";
+        document.getElementById("loader").style.display = "block";
+
+        let progress = 0;
+        const progressBar = document.getElementById("progress");
+        const progressText = document.getElementById("progress-text");
+
+        // Fake scanning animation
+        const interval = setInterval(() => {
+          progress++;
+          progressBar.style.width = progress + "%";
+          progressText.innerText = "Scanning: " + progress + "%";
+
+          if (progress >= 100) {
+            clearInterval(interval);
+
+            // Call backend after animation
+            fetch("/detect", {
+              method: "POST",
+              body: data,
             })
-            .then(response => response.json())
-            .then(data => {
-                const outputImage = document.getElementById('output-image');
-                outputImage.src = data.output_image;
-            })
-            .catch(error => console.error('Error:', error));
-        }
-        function redirecttologinpage() {
-            window.location.href="/login";
-        }
+              .then((res) => res.json())
+              .then((data) => {
+                document.getElementById("loader").style.display = "none";
+
+                if (data.error) {
+                  alert(data.error);
+                  return;
+                }
+
+                document.getElementById("preview").innerHTML = `
+                    <div class="images">
+                        <div>
+                            <h3>Uploaded</h3>
+                            <img src="${data.input}">
+                        </div>
+                        <div>
+                            <h3>Detected</h3>
+                            <img src="${data.output}">
+                        </div>
+                    </div>
+                `;
+              });
+          }
+        }, 25); // speed of scan
+      }
     </script>
-</body>
+  </body>
 </html>
