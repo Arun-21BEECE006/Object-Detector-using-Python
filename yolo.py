@@ -148,15 +148,26 @@
 
 from ultralytics import YOLO
 import cv2
-import os
+import torch
 
 class YOLODetector:
     def __init__(self):
-        print("Loading YOLOv8 model...")
-        self.model = YOLO("yolov8n.pt")  # lightweight model (IMPORTANT)
+        print("Loading YOLOv8 (optimized)...")
+
+        # ⚠️ FORCE CPU MODE (VERY IMPORTANT for Render)
+        torch.set_num_threads(1)
+
+        self.model = YOLO("yolov8n.pt")
 
     def detect(self, image_path, output_path):
-        results = self.model(image_path)
+
+        # ⚠️ reduce memory usage
+        results = self.model.predict(
+            source=image_path,
+            imgsz=320,   # LOWER resolution = LESS RAM
+            conf=0.4,
+            verbose=False
+        )
 
         img = cv2.imread(image_path)
 
