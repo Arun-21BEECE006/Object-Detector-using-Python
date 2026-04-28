@@ -188,13 +188,13 @@ OUTPUT_FOLDER = "output"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# ⚠️ IMPORTANT: DO NOT load YOLO at startup (fixes Render crash)
+# ⚠️ Lazy load YOLOv8 (IMPORTANT for Render Free)
 detector = None
 
 def get_detector():
     global detector
     if detector is None:
-        print("Loading YOLO model (first request)...")
+        print("Loading YOLOv8 model (first request)...")
         detector = YOLODetector()
     return detector
 
@@ -212,23 +212,24 @@ def detect():
 
         file = request.files["image"]
 
-        # 1. Upload to Cloudinary
+        # Upload to Cloudinary
         upload_result = cloudinary.uploader.upload(file)
         input_url = upload_result["secure_url"]
 
-        # 2. Download image locally
+        # Download image
         img_data = requests.get(input_url).content
 
         input_path = os.path.join(UPLOAD_FOLDER, f"in_{int(time.time())}.jpg")
         with open(input_path, "wb") as f:
             f.write(img_data)
 
-        # 3. Run YOLO (lazy-loaded)
         output_path = os.path.join(OUTPUT_FOLDER, f"out_{int(time.time())}.jpg")
+
+        # Run YOLOv8
         detector = get_detector()
         detector.detect(input_path, output_path)
 
-        # 4. Upload result back to Cloudinary
+        # Upload result
         output_upload = cloudinary.uploader.upload(output_path)
         output_url = output_upload["secure_url"]
 

@@ -1,6 +1,7 @@
 flask
-numpy
+ultralytics
 opencv-python-headless
-gunicorn
-cloudinary
+numpy
 requests
+cloudinary
+gunicorn
