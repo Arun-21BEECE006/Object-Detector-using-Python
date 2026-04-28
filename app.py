@@ -92,7 +92,7 @@
 # if __name__ == "__main__":
 #     app.run(debug=True)
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import os
 import time
 import requests
@@ -122,7 +122,7 @@ detector = YOLODetector()
 
 @app.route("/")
 def home():
-    return "YOLO API running"
+    return render_template("index.html")
 
 @app.route("/detect", methods=["POST"])
 def detect():
