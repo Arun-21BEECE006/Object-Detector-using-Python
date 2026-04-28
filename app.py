@@ -92,6 +92,78 @@
 # if __name__ == "__main__":
 #     app.run(debug=True)
 
+# from flask import Flask, request, jsonify, render_template
+# import os
+# import time
+# import requests
+# import cloudinary
+# import cloudinary.uploader
+# from yolo import YOLODetector
+
+# app = Flask(__name__)
+
+# # Cloudinary config (SAFE way)
+# cloudinary.config(
+#     cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+#     api_key=os.environ.get("CLOUDINARY_API_KEY"),
+#     api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+#     secure=True
+# )
+
+# # Temp folders (Render safe)
+# UPLOAD_FOLDER = "temp"
+# OUTPUT_FOLDER = "output"
+
+# os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+# # Load YOLO once
+# detector = YOLODetector()
+
+# @app.route("/")
+# def home():
+#     return render_template("index.html")
+
+# @app.route("/detect", methods=["POST"])
+# def detect():
+#     try:
+#         if "image" not in request.files:
+#             return jsonify({"error": "No image uploaded"}), 400
+
+#         file = request.files["image"]
+
+#         # Step 1: Upload original to Cloudinary
+#         upload_result = cloudinary.uploader.upload(file)
+#         input_url = upload_result["secure_url"]
+
+#         # Step 2: Download for YOLO processing
+#         img_data = requests.get(input_url).content
+#         temp_input = os.path.join(UPLOAD_FOLDER, f"in_{int(time.time())}.jpg")
+
+#         with open(temp_input, "wb") as f:
+#             f.write(img_data)
+
+#         # Step 3: Run YOLO
+#         temp_output = os.path.join(OUTPUT_FOLDER, f"out_{int(time.time())}.jpg")
+#         detector.detect(temp_input, temp_output)
+
+#         # Step 4: Upload result image
+#         output_upload = cloudinary.uploader.upload(temp_output)
+#         output_url = output_upload["secure_url"]
+
+#         return jsonify({
+#             "input": input_url,
+#             "output": output_url
+#         })
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+
+# if __name__ == "__main__":
+#     port = int(os.environ.get("PORT", 8000))
+#     app.run(host="0.0.0.0", port=port)
+
 from flask import Flask, request, jsonify, render_template
 import os
 import time
@@ -102,7 +174,7 @@ from yolo import YOLODetector
 
 app = Flask(__name__)
 
-# Cloudinary config (SAFE way)
+# Cloudinary config
 cloudinary.config(
     cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
     api_key=os.environ.get("CLOUDINARY_API_KEY"),
@@ -110,19 +182,27 @@ cloudinary.config(
     secure=True
 )
 
-# Temp folders (Render safe)
 UPLOAD_FOLDER = "temp"
 OUTPUT_FOLDER = "output"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Load YOLO once
-detector = YOLODetector()
+# ⚠️ IMPORTANT: DO NOT load YOLO at startup (fixes Render crash)
+detector = None
+
+def get_detector():
+    global detector
+    if detector is None:
+        print("Loading YOLO model (first request)...")
+        detector = YOLODetector()
+    return detector
+
 
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 @app.route("/detect", methods=["POST"])
 def detect():
@@ -132,23 +212,24 @@ def detect():
 
         file = request.files["image"]
 
-        # Step 1: Upload original to Cloudinary
+        # 1. Upload to Cloudinary
         upload_result = cloudinary.uploader.upload(file)
         input_url = upload_result["secure_url"]
 
-        # Step 2: Download for YOLO processing
+        # 2. Download image locally
         img_data = requests.get(input_url).content
-        temp_input = os.path.join(UPLOAD_FOLDER, f"in_{int(time.time())}.jpg")
 
-        with open(temp_input, "wb") as f:
+        input_path = os.path.join(UPLOAD_FOLDER, f"in_{int(time.time())}.jpg")
+        with open(input_path, "wb") as f:
             f.write(img_data)
 
-        # Step 3: Run YOLO
-        temp_output = os.path.join(OUTPUT_FOLDER, f"out_{int(time.time())}.jpg")
-        detector.detect(temp_input, temp_output)
+        # 3. Run YOLO (lazy-loaded)
+        output_path = os.path.join(OUTPUT_FOLDER, f"out_{int(time.time())}.jpg")
+        detector = get_detector()
+        detector.detect(input_path, output_path)
 
-        # Step 4: Upload result image
-        output_upload = cloudinary.uploader.upload(temp_output)
+        # 4. Upload result back to Cloudinary
+        output_upload = cloudinary.uploader.upload(output_path)
         output_url = output_upload["secure_url"]
 
         return jsonify({
